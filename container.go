@@ -147,7 +147,7 @@ func (c *Container) Start(ctx context.Context) {
 	}
 	printf("(setup ) %-25s (%s) - container connected to the network: %s", c.Name, c.ID, c.network.name)
 
-	c.hc(ctx)
+	c.executeHealthCheck(ctx)
 
 	for _, cont := range c.children {
 		cont.Start(ctx)
@@ -169,28 +169,28 @@ func (c *Container) After(cc *Container) {
 
 func (c *Container) Reset(ctx context.Context) {
 	c.reset(ctx, c.cli, c)
-	c.hc(ctx)
+	c.executeHealthCheck(ctx)
 
 	for _, cc := range c.children {
 		cc.Reset(ctx)
 	}
 }
 
-func (c *Container) hc(ctx context.Context) {
-	if c.healthcheck != nil {
-	InfLoop:
-		for {
-			select {
-			case <-ctx.Done():
-				c.t.Fatalf("health check failure: %s", ctx.Err())
-			case <-time.After(1 * time.Second):
-				if err := c.healthcheck(); err != nil {
-					printf("(setup ) %-25s (%s) - container health failure: %s", c.Name, c.ID, err.Error())
-					continue InfLoop
-				}
-				break InfLoop
+func (c *Container) executeHealthCheck(ctx context.Context) {
+	if c.healthcheck == nil {
+		return
+	}
+InfLoop:
+	for {
+		select {
+		case <-ctx.Done():
+			c.t.Fatalf("health check failure: %s", ctx.Err())
+		case <-time.After(1 * time.Second):
+			if err := c.healthcheck(); err != nil {
+				printf("(setup ) %-25s (%s) - container health failure: %s", c.Name, c.ID, err.Error())
+				continue InfLoop
 			}
+			break InfLoop
 		}
 	}
-
 }
