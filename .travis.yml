@@ -5,7 +5,7 @@ before_install:
   - mkdir -p $GOPATH/bin
   - curl https://glide.sh/get | sh
 install:
-  - glide install
+  - glide install -v
 script:
   - go test -cover -coverprofile=coverage.txt
 after_success:
