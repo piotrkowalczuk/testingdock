@@ -15,7 +15,7 @@ type NetworkOpts struct {
 
 // Network ...
 type Network struct {
-	t        testing.TB ``
+	t        testing.TB
 	cli      *client.Client
 	id, name string
 	gateway  string
