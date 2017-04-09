@@ -1,0 +1,6 @@
+.idea
+vendor
+*.out
+*.log
+glide.lock
+*.test
