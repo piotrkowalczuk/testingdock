@@ -13,9 +13,10 @@ import (
 )
 
 func TestContainer_Start(t *testing.T) {
-	s := testingdock.GetOrCreateSuite(t, "testingdock-test", testingdock.SuiteOpts{})
+	name := "testingdock-test"
+	s := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{})
 	n := s.Network(testingdock.NetworkOpts{
-		Name: "testingdock-test",
+		Name: name,
 	})
 
 	postgresPort := testingdock.RandomPort(t)
