@@ -12,7 +12,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 )
 
@@ -110,7 +109,7 @@ func (c *Container) Start(ctx context.Context) {
 		Filters: containerListArgs,
 	})
 	if err != nil {
-		c.t.Fatalf("container creation failure: %s", err.Error())
+		c.t.Fatalf("container listing failure: %s", err.Error())
 	}
 	for _, cont := range containers {
 		if err = c.cli.ContainerRemove(ctx, cont.ID, types.ContainerRemoveOptions{Force: true}); err != nil {
@@ -119,16 +118,15 @@ func (c *Container) Start(ctx context.Context) {
 		printf("(setup ) %-25s (%s) - container removed", cont.Names[0], cont.ID)
 	}
 
-	cont, err := c.cli.ContainerCreate(ctx, c.ccfg, c.hcfg, nil, c.Name)
+	hcfg := *c.hcfg
+	hcfg.NetworkMode = container.NetworkMode(c.network.name)
+
+	cont, err := c.cli.ContainerCreate(ctx, c.ccfg, &hcfg, nil, c.Name)
 	if err != nil {
 		c.t.Fatalf("container creation failure: %s", err.Error())
 	}
 
 	c.ID = cont.ID
-
-	if err = c.cli.ContainerStart(ctx, c.ID, types.ContainerStartOptions{}); err != nil {
-		c.t.Fatalf("container start failure: %s", err.Error())
-	}
 
 	c.cancel = func() {
 		if err := c.cli.NetworkDisconnect(ctx, c.network.id, c.ID, true); err != nil {
@@ -141,11 +139,10 @@ func (c *Container) Start(ctx context.Context) {
 		printf("(cancel) %-25s (%s) - container removed", c.Name, c.ID)
 	}
 
-	if err = c.cli.NetworkConnect(ctx, c.network.id, c.Name, &network.EndpointSettings{}); err != nil {
-		c.cancel()
+	if err = c.cli.ContainerStart(ctx, c.ID, types.ContainerStartOptions{}); err != nil {
 		c.t.Fatalf("container start failure: %s", err.Error())
 	}
-	printf("(setup ) %-25s (%s) - container connected to the network: %s", c.Name, c.ID, c.network.name)
+	printf("(setup ) %-25s (%s) - container started", c.Name, c.ID)
 
 	c.executeHealthCheck(ctx)
 

@@ -15,6 +15,7 @@ var registry map[string]*Suite
 
 type SuiteOpts struct {
 	Client *client.Client
+	Skip   bool
 }
 
 type Suite struct {
@@ -35,7 +36,11 @@ func GetOrCreateSuite(t testing.TB, name string, opts SuiteOpts) *Suite {
 		var err error
 		c, err = client.NewEnvClient()
 		if err != nil {
-			t.Fatalf("docker client instantiation failure: %s", err.Error())
+			if opts.Skip {
+				t.Skipf("docker client instantiation failure: %s", err.Error())
+			} else {
+				t.Fatalf("docker client instantiation failure: %s", err.Error())
+			}
 		}
 	}
 

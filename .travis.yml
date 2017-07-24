@@ -10,6 +10,6 @@ before_install:
 install:
   - glide install -v
 script:
-  - go test -cover -coverprofile=coverage.txt
+  - go test -race -timeout=50s -coverprofile=coverage.txt
 after_success:
   - bash <(curl -s https://codecov.io/bash)
