@@ -51,7 +51,7 @@ func (n *Network) Start(ctx context.Context) {
 	}
 	printf("(setup ) %-25s (%s) - network created", n.name, n.id)
 
-	ni, err := n.cli.NetworkInspect(ctx, n.id)
+	ni, err := n.cli.NetworkInspect(ctx, n.id, false)
 	if err != nil {
 		n.cancel()
 		n.t.Fatalf("network inspect failure: %s", err.Error())
@@ -115,4 +115,5 @@ func (n *Network) reset(ctx context.Context) {
 	for _, c := range n.children {
 		c.Reset(ctx)
 	}
+	printf("(reset ) %-25s (%s) - network reseted", n.name, n.id)
 }

@@ -177,6 +177,8 @@ func (c *Container) Reset(ctx context.Context) {
 	for _, cc := range c.children {
 		cc.Reset(ctx)
 	}
+
+	printf("(reset ) %-25s (%s) - container reseted", c.Name, c.ID)
 }
 
 func (c *Container) executeHealthCheck(ctx context.Context) {

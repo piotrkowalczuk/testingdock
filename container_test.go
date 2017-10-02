@@ -5,20 +5,18 @@ import (
 	"database/sql"
 	"testing"
 
-	_ "github.com/lib/pq"
-
-	"time"
-
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
+	_ "github.com/lib/pq"
 	"github.com/piotrkowalczuk/testingdock"
 )
 
 func TestContainer_Start(t *testing.T) {
-	name := "testingdock-test"
-	s := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{
-		Timeout: 5 * time.Second,
-	})
+	name := "TestContainer_Start"
+	s, ok := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{})
+	if ok {
+		t.Fatal("this suite should not exists yet")
+	}
 	n := s.Network(testingdock.NetworkOpts{
 		Name: name,
 	})

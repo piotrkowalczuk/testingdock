@@ -1,12 +1,9 @@
 package testingdock_test
 
 import (
+	"context"
 	"os"
 	"testing"
-
-	"context"
-
-	"time"
 
 	"github.com/piotrkowalczuk/testingdock"
 )
@@ -20,15 +17,16 @@ func TestMain(m *testing.M) {
 }
 
 func TestGetOrCreateSuite(t *testing.T) {
-	s1 := testingdock.GetOrCreateSuite(t, "TestGetOrCreateSuite", testingdock.SuiteOpts{})
-	s2 := testingdock.GetOrCreateSuite(t, "TestGetOrCreateSuite", testingdock.SuiteOpts{})
-	s3 := testingdock.GetOrCreateSuite(t, "TestGetOrCreateSuite", testingdock.SuiteOpts{
-		Timeout: 10 * time.Second,
-	})
+	s1, ok1 := testingdock.GetOrCreateSuite(t, "TestGetOrCreateSuite", testingdock.SuiteOpts{})
+	s2, ok2 := testingdock.GetOrCreateSuite(t, "TestGetOrCreateSuite", testingdock.SuiteOpts{})
 
 	s1.Reset(context.TODO())
 	s2.Reset(context.TODO())
-	s3.Reset(context.TODO())
 
-	testingdock.UnregisterAll()
+	if ok1 {
+		t.Error("first call should create new suite")
+	}
+	if !ok2 {
+		t.Error("second call should return suite from registry")
+	}
 }

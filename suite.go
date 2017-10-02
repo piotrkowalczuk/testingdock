@@ -3,7 +3,6 @@ package testingdock
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/docker/docker/client"
 )
@@ -15,9 +14,8 @@ func init() {
 var registry map[string]*Suite
 
 type SuiteOpts struct {
-	Client  *client.Client
-	Skip    bool
-	Timeout time.Duration
+	Client *client.Client
+	Skip   bool
 }
 
 type Suite struct {
@@ -27,18 +25,11 @@ type Suite struct {
 	network *Network
 }
 
-// GetOrCreateSuite ...
-func GetOrCreateSuite(t testing.TB, name string, opts SuiteOpts) *Suite {
+// GetOrCreateSuite returns suite with given name. If such suite is not registered yet it creates it.
+// Returns true if suite was already there, otherwise false.
+func GetOrCreateSuite(t testing.TB, name string, opts SuiteOpts) (*Suite, bool) {
 	if s, ok := registry[name]; ok {
-		if opts.Timeout != 0 {
-			ctx, cancel := context.WithTimeout(context.TODO(), opts.Timeout)
-			defer cancel()
-
-			s.Reset(ctx)
-		} else {
-			s.Reset(context.Background())
-		}
-		return s
+		return s, true
 	}
 
 	c := opts.Client
@@ -52,26 +43,27 @@ func GetOrCreateSuite(t testing.TB, name string, opts SuiteOpts) *Suite {
 				t.Fatalf("docker client instantiation failure: %s", err.Error())
 			}
 		}
-		//c.UpdateClientVersion(c.ClientVersion())
 	}
 
 	s := &Suite{cli: c, t: t, name: name}
 	registry[s.name] = s
-	return s
+	return s, false
 }
 
 func UnregisterAll() {
+	printf("(unregi) start")
 	for name, reg := range registry {
 		if reg.network == nil {
 			continue
 		}
 		if err := reg.network.Close(); err != nil {
-			printf("network (%s) close failure: %s", name, err.Error())
+			printf("(unregi) %-25s (%-64s) - suite unregister failure: %s", name, "", err.Error())
 		} else {
-			printf("network (%s) closed", name)
+			printf("(unregi) %-25s (%-64s) - suite unregistered", name, "")
 		}
 		delete(registry, name)
 	}
+	printf("(unregi) finished")
 }
 
 func (s *Suite) Container(opts ContainerOpts) *Container {
