@@ -66,6 +66,7 @@ type Container struct {
 	children        []*Container
 	cancel          func()
 	reset           ResetFunc
+	closed          bool
 }
 
 func newContainer(t testing.TB, c *client.Client, opts ContainerOpts) *Container {
@@ -129,6 +130,9 @@ func (c *Container) Start(ctx context.Context) {
 	c.ID = cont.ID
 
 	c.cancel = func() {
+		if c.closed {
+			return
+		}
 		if err := c.cli.NetworkDisconnect(ctx, c.network.id, c.ID, true); err != nil {
 			c.t.Fatalf("container disconnect failure: %s", err.Error())
 		}
@@ -142,6 +146,7 @@ func (c *Container) Start(ctx context.Context) {
 	if err = c.cli.ContainerStart(ctx, c.ID, types.ContainerStartOptions{}); err != nil {
 		c.t.Fatalf("container start failure: %s", err.Error())
 	}
+
 	printf("(setup ) %-25s (%s) - container started", c.Name, c.ID)
 
 	c.executeHealthCheck(ctx)
@@ -156,6 +161,7 @@ func (c *Container) Close() error {
 		cont.Close()
 	}
 	c.cancel()
+	c.closed = true
 	return nil
 }
 

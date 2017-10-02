@@ -7,6 +7,8 @@ import (
 
 	_ "github.com/lib/pq"
 
+	"time"
+
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
 	"github.com/piotrkowalczuk/testingdock"
@@ -14,7 +16,9 @@ import (
 
 func TestContainer_Start(t *testing.T) {
 	name := "testingdock-test"
-	s := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{})
+	s := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{
+		Timeout: 5 * time.Second,
+	})
 	n := s.Network(testingdock.NetworkOpts{
 		Name: name,
 	})
@@ -29,7 +33,7 @@ func TestContainer_Start(t *testing.T) {
 	}
 	postgres := s.Container(testingdock.ContainerOpts{
 		Name:      "postgres",
-		ForcePull: true,
+		ForcePull: false,
 		Config: &container.Config{
 			Image: "postgres:9.6",
 		},

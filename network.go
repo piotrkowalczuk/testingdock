@@ -21,6 +21,7 @@ type Network struct {
 	gateway  string
 	cancel   func()
 	children []*Container
+	closed   bool
 }
 
 func newNetwork(t testing.TB, c *client.Client, opts NetworkOpts) *Network {
@@ -40,6 +41,9 @@ func (n *Network) Start(ctx context.Context) {
 	}
 	n.id = res.ID
 	n.cancel = func() {
+		if n.closed {
+			return
+		}
 		if err := n.cli.NetworkRemove(ctx, n.id); err != nil {
 			n.t.Fatalf("network removal failure: %s", err.Error())
 		}
@@ -47,7 +51,7 @@ func (n *Network) Start(ctx context.Context) {
 	}
 	printf("(setup ) %-25s (%s) - network created", n.name, n.id)
 
-	ni, err := n.cli.NetworkInspect(ctx, n.id, false)
+	ni, err := n.cli.NetworkInspect(ctx, n.id)
 	if err != nil {
 		n.cancel()
 		n.t.Fatalf("network inspect failure: %s", err.Error())
@@ -98,6 +102,7 @@ func (n *Network) Close() error {
 		cont.Close()
 	}
 	n.cancel()
+	n.closed = true
 	return nil
 }
 
