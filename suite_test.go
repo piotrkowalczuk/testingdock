@@ -29,4 +29,6 @@ func TestGetOrCreateSuite(t *testing.T) {
 	if !ok2 {
 		t.Error("second call should return suite from registry")
 	}
+
+	testingdock.UnregisterAll()
 }
