@@ -7,6 +7,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
+	"time"
 )
 
 type NetworkOpts struct {
@@ -112,8 +113,9 @@ func (n *Network) After(c *Container) {
 }
 
 func (n *Network) reset(ctx context.Context) {
+	now := time.Now()
 	for _, c := range n.children {
 		c.Reset(ctx)
 	}
-	printf("(reset ) %-25s (%s) - network reseted", n.name, n.id)
+	printf("(reset ) %-25s (%s) - network reseted in %s", n.name, n.id, time.Since(now))
 }
