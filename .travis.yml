@@ -5,9 +5,9 @@ services:
   - docker
 before_install:
   - mkdir -p $GOPATH/bin
-  - curl https://glide.sh/get | sh
+  - go get -u github.com/golang/dep/cmd/dep
 install:
-  - glide install -v
+  - dep ensure
 script:
   - go test -race -timeout=50s -coverprofile=coverage.txt
 after_success:
