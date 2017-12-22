@@ -15,9 +15,15 @@ import (
 	"github.com/docker/docker/client"
 )
 
+// HealthCheckFunc is the type of a health checking function, which is supposed
+// to return nil on success, indicating that a container is not only "up", but
+// "accessible" in the specified way.
+//
+// If the function returns an error, it will be called until it doesn't (blocking).
 type HealthCheckFunc func() error
 
-// HealthCheckHTTP ...
+// HealthCheckHTTP is a pre-implemented HealthCheckFunc which checks if the given
+// url returns http.StatusOk.
 func HealthCheckHTTP(url string) HealthCheckFunc {
 	return func() error {
 		res, err := http.Get(url)
@@ -31,20 +37,26 @@ func HealthCheckHTTP(url string) HealthCheckFunc {
 	}
 }
 
+// ResetFunc is the type of the container reset function, which is called on
+// c.Reset().
 type ResetFunc func(ctx context.Context, cli *client.Client, c *Container) error
 
+// ResetRestart is a pre-implemented ResetFunc, which just restarts the container.
 func ResetRestart() ResetFunc {
 	return func(ctx context.Context, cli *client.Client, c *Container) error {
 		return cli.ContainerRestart(ctx, c.ID, nil)
 	}
 }
 
+// ResetCustom is just a convenience wrapper to set a ResetFunc.
 func ResetCustom(fn func() error) ResetFunc {
 	return func(ctx context.Context, cli *client.Client, c *Container) error {
 		return fn()
 	}
 }
 
+// ContainerOpts is an option struct for creating a docker container
+// configuration.
 type ContainerOpts struct {
 	ForcePull   bool
 	Config      *container.Config
@@ -54,6 +66,10 @@ type ContainerOpts struct {
 	Reset       ResetFunc
 }
 
+// Container is a docker container configuration,
+// not necessarily a running or created container.
+// This should usually be created via the NewContainer
+// function.
 type Container struct {
 	t               testing.TB
 	forcePull       bool
@@ -63,13 +79,15 @@ type Container struct {
 	hcfg            *container.HostConfig
 	ID, Name, Image string
 	healthcheck     HealthCheckFunc
-	children        []*Container
-	cancel          func()
-	reset           ResetFunc
-	closed          bool
+	// children are dependencies that are started after the main container
+	children []*Container
+	cancel   func()
+	reset    ResetFunc
+	closed   bool
 }
 
-func newContainer(t testing.TB, c *client.Client, opts ContainerOpts) *Container {
+// NewContainer creates a new container configuration with the given options.
+func NewContainer(t testing.TB, c *client.Client, opts ContainerOpts) *Container {
 	return &Container{
 		t:           t,
 		forcePull:   opts.ForcePull,
@@ -82,6 +100,7 @@ func newContainer(t testing.TB, c *client.Client, opts ContainerOpts) *Container
 	}
 }
 
+// Start actually starts a docker container. This may also pull images.
 func (c *Container) Start(ctx context.Context) {
 	imageListArgs := filters.NewArgs()
 	imageListArgs.Add("reference", c.ccfg.Image)
@@ -156,31 +175,39 @@ func (c *Container) Start(ctx context.Context) {
 	}
 }
 
+// Close closes a container and its children. This calls the
+// 'cancel' function set in the Container struct.
 func (c *Container) Close() error {
 	for _, cont := range c.children {
-		cont.Close()
+		cont.Close() // TODO: check errors
 	}
 	c.cancel()
 	c.closed = true
 	return nil
 }
 
+// After adds a child container (dependency, sort of)
+// to the current container configuration in the same network.
 func (c *Container) After(cc *Container) {
 	cc.network = c.network
 	c.children = append(c.children, cc)
 }
 
+// Reset calls the ResetFunc set in the Container struct for the
+// whole configuration, including children containers.
 func (c *Container) Reset(ctx context.Context) {
-	c.reset(ctx, c.cli, c)
+	c.reset(ctx, c.cli, c) // TODO: check errors
 	c.executeHealthCheck(ctx)
 
 	for _, cc := range c.children {
 		cc.Reset(ctx)
 	}
 
-	printf("(reset ) %-25s (%s) - container reseted", c.Name, c.ID)
+	printf("(reset ) %-25s (%s) - container reset", c.Name, c.ID)
 }
 
+// Blocks until either the healthcheck returns no error or the context
+// is cancelled.
 func (c *Container) executeHealthCheck(ctx context.Context) {
 	if c.healthcheck == nil {
 		return

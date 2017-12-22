@@ -7,17 +7,18 @@ import (
 	"testing"
 )
 
+// printf just wraps fmt.Printf.
 func printf(format string, args ...interface{}) {
 	fmt.Printf("··· DOCK: %s\n", fmt.Sprintf(format, args...))
 }
 
-// RandomPort ...
+// RandomPort returns a random available port as a string.
 func RandomPort(t testing.TB) string {
 	return strconv.FormatInt(int64(randomPort(t)), 10)
 
 }
 
-// RandomPort returns random available port.
+// randomPort returns random available port as an int.
 func randomPort(t testing.TB) int {
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {

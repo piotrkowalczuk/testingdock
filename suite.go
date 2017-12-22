@@ -1,3 +1,4 @@
+// A package that simplifies integration testing with docker.
 package testingdock
 
 import (
@@ -13,11 +14,15 @@ func init() {
 
 var registry map[string]*Suite
 
+// SuiteOpts is an option struct for getting or creating a suite in GetOrCreateSuite.
 type SuiteOpts struct {
+	// optional docker client, if one already exists
 	Client *client.Client
-	Skip   bool
+	// whether to fail on instantiation errors
+	Skip bool
 }
 
+// Suite represents a testing suite with a docker setup.
 type Suite struct {
 	name    string
 	t       testing.TB
@@ -25,8 +30,8 @@ type Suite struct {
 	network *Network
 }
 
-// GetOrCreateSuite returns suite with given name. If such suite is not registered yet it creates it.
-// Returns true if suite was already there, otherwise false.
+// GetOrCreateSuite returns a suite with the given name. If such suite is not registered yet it creates it.
+// Returns true if the suite was already there, otherwise false.
 func GetOrCreateSuite(t testing.TB, name string, opts SuiteOpts) (*Suite, bool) {
 	if s, ok := registry[name]; ok {
 		return s, true
@@ -50,6 +55,7 @@ func GetOrCreateSuite(t testing.TB, name string, opts SuiteOpts) (*Suite, bool) 
 	return s, false
 }
 
+// UnregisterAll unregisters all suites by closing the networks.
 func UnregisterAll() {
 	printf("(unregi) start")
 	for name, reg := range registry {
@@ -66,15 +72,24 @@ func UnregisterAll() {
 	printf("(unregi) finished")
 }
 
+// Container creates a new docker container configuration with the given options.
 func (s *Suite) Container(opts ContainerOpts) *Container {
-	return newContainer(s.t, s.cli, opts)
+	return NewContainer(s.t, s.cli, opts)
 }
 
+// Network creates a new docker network configuration with the given options.
 func (s *Suite) Network(opts NetworkOpts) *Network {
-	s.network = newNetwork(s.t, s.cli, opts)
+	s.network = NewNetwork(s.t, s.cli, opts)
 	return s.network
 }
 
+// Reset "resets" the underlying docker containers in the network. This
+// calls the ResetFunc and HealthCheckFunc for each of them. These can be passed in
+// ContainerOpts when creating a container.
+//
+// The context is passed explicitly to ResetFunc, where it can be used and
+// implicitly to HealthCheckFunc where it may cancel the blocking health
+// check loop.
 func (s *Suite) Reset(ctx context.Context) {
 	if s.network != nil {
 		s.network.reset(ctx)
