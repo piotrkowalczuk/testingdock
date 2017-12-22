@@ -38,7 +38,8 @@ func NewNetwork(t testing.TB, c *client.Client, opts NetworkOpts) *Network {
 	}
 }
 
-// Start creates the actual docker network.
+// Start creates the actual docker network and also starts the containers that
+// are part of the network.
 func (n *Network) Start(ctx context.Context) {
 	n.initialCleanup(ctx)
 
@@ -110,7 +111,7 @@ func (n *Network) initialCleanup(ctx context.Context) {
 // Implements io.Closer interface.
 func (n *Network) Close() error {
 	for _, cont := range n.children {
-		cont.Close()
+		cont.Close() // nolint: errcheck
 	}
 	n.cancel()
 	n.closed = true

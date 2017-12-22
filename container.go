@@ -70,7 +70,7 @@ type ContainerOpts struct {
 // not necessarily a running or created container.
 // This should usually be created via the NewContainer
 // function.
-type Container struct {
+type Container struct { // nolint: maligned
 	t               testing.TB
 	forcePull       bool
 	cli             *client.Client
@@ -101,7 +101,11 @@ func NewContainer(t testing.TB, c *client.Client, opts ContainerOpts) *Container
 }
 
 // Start actually starts a docker container. This may also pull images.
-func (c *Container) Start(ctx context.Context) {
+func (c *Container) Start(ctx context.Context) { // nolint: gocyclo
+	if c.network == nil {
+		c.t.Fatalf("Container %s not added to any network!", c.Name)
+	}
+
 	imageListArgs := filters.NewArgs()
 	imageListArgs.Add("reference", c.ccfg.Image)
 
@@ -177,9 +181,10 @@ func (c *Container) Start(ctx context.Context) {
 
 // Close closes a container and its children. This calls the
 // 'cancel' function set in the Container struct.
+// Implements io.Closer interface.
 func (c *Container) Close() error {
 	for _, cont := range c.children {
-		cont.Close() // TODO: check errors
+		cont.Close() // nolint: errcheck
 	}
 	c.cancel()
 	c.closed = true
@@ -195,8 +200,11 @@ func (c *Container) After(cc *Container) {
 
 // Reset calls the ResetFunc set in the Container struct for the
 // whole configuration, including children containers.
+// Aborts early if there is any error during reset.
 func (c *Container) Reset(ctx context.Context) {
-	c.reset(ctx, c.cli, c) // TODO: check errors
+	if err := c.reset(ctx, c.cli, c); err != nil {
+		c.t.Fatalf("container reset failure: %s", err.Error())
+	}
 	c.executeHealthCheck(ctx)
 
 	for _, cc := range c.children {

@@ -12,15 +12,19 @@ import (
 )
 
 func TestContainer_Start(t *testing.T) {
+	// create suite
 	name := "TestContainer_Start"
 	s, ok := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{})
 	if ok {
 		t.Fatal("this suite should not exists yet")
 	}
+
+	// create network
 	n := s.Network(testingdock.NetworkOpts{
 		Name: name,
 	})
 
+	// create postgres and mnemosyne configurations
 	postgresPort := testingdock.RandomPort(t)
 	mnemosynePort := testingdock.RandomPort(t)
 	mnemosyneDebugPort := testingdock.RandomPort(t)
@@ -70,12 +74,16 @@ func TestContainer_Start(t *testing.T) {
 		Reset:       testingdock.ResetRestart(),
 	})
 
+	// add postgres to the test network
 	n.After(postgres)
+	// start mnemosyned after postgres, this also adds it to the test network
 	postgres.After(mnemosyned)
 
+	// start the network, this also starts the containers
 	n.Start(context.TODO())
 	defer n.Close()
 
+	// test stuff within the database
 	testQueries(t, db)
 
 	s.Reset(context.TODO())

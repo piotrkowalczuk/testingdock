@@ -1,4 +1,4 @@
-// A package that simplifies integration testing with docker.
+// Package testingdock simplifies integration testing with docker.
 package testingdock
 
 import (
