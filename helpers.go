@@ -36,3 +36,20 @@ func randomPort(t testing.TB) int {
 
 	return l.Addr().(*net.TCPAddr).Port
 }
+
+// Check whether a map containing labels has the "owner=testingdock" label.
+func isOwnedByTestingdock(labels map[string]string) bool {
+	for key, value := range labels {
+		if fmt.Sprintf("%s=%s", key, value) == "owner=testingdock" {
+			return true
+		}
+	}
+	return false
+}
+
+// Create a map of labels containting the "owner=testingdock" label.
+func createTestingLabel() map[string]string {
+	labels := make(map[string]string)
+	labels["owner"] = "testingdock"
+	return labels
+}

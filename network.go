@@ -27,23 +27,27 @@ type Network struct {
 	cancel   func()
 	children []*Container
 	closed   bool
+	labels   map[string]string
 }
 
-// NewNetwork creates a new docker network configuration with the given options.
-func NewNetwork(t testing.TB, c *client.Client, opts NetworkOpts) *Network {
+// Creates a new docker network configuration with the given options.
+func newNetwork(t testing.TB, c *client.Client, opts NetworkOpts) *Network {
 	return &Network{
-		t:    t,
-		cli:  c,
-		name: opts.Name,
+		t:      t,
+		cli:    c,
+		name:   opts.Name,
+		labels: createTestingLabel(),
 	}
 }
 
-// Start creates the actual docker network and also starts the containers that
+// Creates the actual docker network and also starts the containers that
 // are part of the network.
-func (n *Network) Start(ctx context.Context) {
+func (n *Network) start(ctx context.Context) {
 	n.initialCleanup(ctx)
 
-	res, err := n.cli.NetworkCreate(ctx, n.name, types.NetworkCreate{})
+	res, err := n.cli.NetworkCreate(ctx, n.name, types.NetworkCreate{
+		Labels: n.labels,
+	})
 	if err != nil {
 		n.t.Fatalf("network creation failure: %s", err.Error())
 	}
@@ -67,7 +71,7 @@ func (n *Network) Start(ctx context.Context) {
 	n.gateway = ni.IPAM.Config[0].Gateway
 	printf("(setup ) %-25s (%s) - network got gateway ip: %s", n.name, n.id, n.gateway)
 	for _, cont := range n.children {
-		cont.Start(ctx)
+		cont.start(ctx)
 	}
 }
 
@@ -89,29 +93,38 @@ func (n *Network) initialCleanup(ctx context.Context) {
 		for _, cc := range containers {
 			for _, nnn := range cc.NetworkSettings.Networks {
 				if nnn.NetworkID == nn.ID {
-					if err = n.cli.ContainerRemove(ctx, cc.ID, types.ContainerRemoveOptions{
-						RemoveVolumes: true,
-						Force:         true,
-					}); err != nil {
-						n.t.Fatalf("container removal failure: %s", err.Error())
+					if isOwnedByTestingdock(cc.Labels) {
+						if err = n.cli.ContainerRemove(ctx, cc.ID, types.ContainerRemoveOptions{
+							RemoveVolumes: true,
+							Force:         true,
+						}); err != nil {
+							n.t.Fatalf("container removal failure: %s", err.Error())
+						}
+						printf("(setup ) %-25s (%s) - network endpoint removed: %s", nn.Name, nn.ID, cc.Names[0])
+					} else {
+						n.t.Fatalf("container with ID %s already exists, but wasn't started by tesingdock, aborting!", cc.ID)
 					}
-					printf("(setup ) %-25s (%s) - network endpoint removed: %s", nn.Name, nn.ID, cc.Names[0])
 				}
 			}
 		}
-		if err = n.cli.NetworkRemove(ctx, nn.ID); err != nil {
-			n.t.Fatalf("network removal failure: %s", err.Error())
+
+		if isOwnedByTestingdock(nn.Labels) {
+			if err = n.cli.NetworkRemove(ctx, nn.ID); err != nil {
+				n.t.Fatalf("network removal failure: %s", err.Error())
+			}
+			printf("(setup ) %-25s (%s) - network removed", nn.Name, nn.ID)
+		} else {
+			n.t.Fatalf("network with name %s already exists, but wasn't started by tesingdock, aborting!", n.name)
 		}
-		printf("(setup ) %-25s (%s) - network removed", nn.Name, nn.ID)
 	}
 }
 
-// Close the docker network. This also closes the
+// Closes the docker network. This also closes the
 // children containers if any are set in the Network struct.
 // Implements io.Closer interface.
-func (n *Network) Close() error {
+func (n *Network) close() error {
 	for _, cont := range n.children {
-		cont.Close() // nolint: errcheck
+		cont.close() // nolint: errcheck
 	}
 	n.cancel()
 	n.closed = true
@@ -130,7 +143,7 @@ func (n *Network) After(c *Container) {
 func (n *Network) reset(ctx context.Context) {
 	now := time.Now()
 	for _, c := range n.children {
-		c.Reset(ctx)
+		c.reset(ctx)
 	}
 	printf("(reset ) %-25s (%s) - network reseted in %s", n.name, n.id, time.Since(now))
 }

@@ -14,7 +14,9 @@ import (
 func TestContainer_Start(t *testing.T) {
 	// create suite
 	name := "TestContainer_Start"
-	s, ok := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{})
+	s, ok := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{
+		Verbose: true,
+	})
 	if ok {
 		t.Fatal("this suite should not exists yet")
 	}
@@ -36,6 +38,7 @@ func TestContainer_Start(t *testing.T) {
 	postgres := s.Container(testingdock.ContainerOpts{
 		Name:      "postgres",
 		ForcePull: false,
+		Verbose:   true,
 		Config: &container.Config{
 			Image: "postgres:9.6",
 		},
@@ -80,8 +83,8 @@ func TestContainer_Start(t *testing.T) {
 	postgres.After(mnemosyned)
 
 	// start the network, this also starts the containers
-	n.Start(context.TODO())
-	defer n.Close()
+	s.Start(context.TODO())
+	defer s.Close()
 
 	// test stuff within the database
 	testQueries(t, db)

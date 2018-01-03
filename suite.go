@@ -1,4 +1,8 @@
 // Package testingdock simplifies integration testing with docker.
+//
+// Note: this library spawns containers and networks under the label
+// 'owner=testingdock', which may be subject to aggressive manipulation
+// and cleanup.
 package testingdock
 
 import (
@@ -6,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/daemon/logger"
 )
 
 func init() {
@@ -20,14 +25,18 @@ type SuiteOpts struct {
 	Client *client.Client
 	// whether to fail on instantiation errors
 	Skip bool
+	// whether to show daemon logs
+	Verbose bool
 }
 
 // Suite represents a testing suite with a docker setup.
 type Suite struct {
-	name    string
-	t       testing.TB
-	cli     *client.Client
-	network *Network
+	name       string
+	t          testing.TB
+	cli        *client.Client
+	network    *Network
+	logWatcher *logger.LogWatcher
+	verbose    bool
 }
 
 // GetOrCreateSuite returns a suite with the given name. If such suite is not registered yet it creates it.
@@ -50,7 +59,12 @@ func GetOrCreateSuite(t testing.TB, name string, opts SuiteOpts) (*Suite, bool) 
 		}
 	}
 
-	s := &Suite{cli: c, t: t, name: name}
+	s := &Suite{
+		cli:     c,
+		t:       t,
+		name:    name,
+		verbose: opts.Verbose,
+	}
 	registry[s.name] = s
 	return s, false
 }
@@ -59,10 +73,8 @@ func GetOrCreateSuite(t testing.TB, name string, opts SuiteOpts) (*Suite, bool) 
 func UnregisterAll() {
 	printf("(unregi) start")
 	for name, reg := range registry {
-		if reg.network == nil {
-			continue
-		}
-		if err := reg.network.Close(); err != nil {
+
+		if err := reg.Close(); err != nil {
 			printf("(unregi) %-25s (%-64s) - suite unregister failure: %s", name, "", err.Error())
 		} else {
 			printf("(unregi) %-25s (%-64s) - suite unregistered", name, "")
@@ -74,12 +86,12 @@ func UnregisterAll() {
 
 // Container creates a new docker container configuration with the given options.
 func (s *Suite) Container(opts ContainerOpts) *Container {
-	return NewContainer(s.t, s.cli, opts)
+	return newContainer(s.t, s.cli, opts)
 }
 
 // Network creates a new docker network configuration with the given options.
 func (s *Suite) Network(opts NetworkOpts) *Network {
-	s.network = NewNetwork(s.t, s.cli, opts)
+	s.network = newNetwork(s.t, s.cli, opts)
 	return s.network
 }
 
@@ -94,4 +106,40 @@ func (s *Suite) Reset(ctx context.Context) {
 	if s.network != nil {
 		s.network.reset(ctx)
 	}
+}
+
+// Start starts the suite. This starts all networks in the suite and the underlying containers,
+// as well as the daemon logger, if Verbosity is enabled.
+func (s *Suite) Start(ctx context.Context) {
+	if s.logWatcher == nil && s.verbose {
+		printf("(daemon) starting logging")
+		s.logWatcher = logger.NewLogWatcher()
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					printf("(daemon) stopping logging")
+					s.logWatcher.Close()
+					return
+				case msg := <-s.logWatcher.Msg:
+					printf("(daemon) %s", msg.Line)
+				case err := <-s.logWatcher.Err:
+					printf("(d err ) %s", err)
+				}
+			}
+		}()
+	}
+
+	if s.network != nil {
+		s.network.start(ctx)
+	}
+}
+
+// Close stops the suites. This stops all networks in the suite and the underlying containers.
+func (s *Suite) Close() error {
+	if s.network != nil {
+		return s.network.close()
+	}
+
+	return nil
 }

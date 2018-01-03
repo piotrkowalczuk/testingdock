@@ -5,3 +5,9 @@ Simple helper library for integration testing with docker in a programmatical wa
 ## Example
 
 See the [Container test suite](./container_test.go).
+
+## Notes
+
+This library will create networks and containers under the label `owner=testingdock`.
+Containers and networks with this label will be considered to have been started by this library
+and may be subject to aggressive manipulation and cleanup.

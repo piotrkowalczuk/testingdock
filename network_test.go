@@ -13,9 +13,12 @@ func TestNetwork_Start(t *testing.T) {
 	if ok {
 		t.Fatal("this suite should not exists yet")
 	}
-	n1 := s.Network(testingdock.NetworkOpts{Name: "TestNetwork_Start_1"})
-	n2 := s.Network(testingdock.NetworkOpts{Name: "TestNetwork_Start_2"})
+	s.Network(testingdock.NetworkOpts{Name: "TestNetwork_Start_1"})
+	s.Network(testingdock.NetworkOpts{Name: "TestNetwork_Start_2"})
 
-	n1.Start(context.TODO())
-	n2.Start(context.TODO())
+	s.Start(context.TODO())
+
+	if err := s.Close(); err != nil {
+		t.Fatalf("Failed to close a network: %s", err.Error())
+	}
 }
