@@ -2,6 +2,7 @@ package testingdock_test
 
 import (
 	"context"
+	"flag"
 	"os"
 	"testing"
 
@@ -9,6 +10,8 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	flag.Parse()
+
 	got := m.Run()
 
 	testingdock.UnregisterAll()

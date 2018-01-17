@@ -14,9 +14,7 @@ import (
 func TestContainer_Start(t *testing.T) {
 	// create suite
 	name := "TestContainer_Start"
-	s, ok := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{
-		Verbose: true,
-	})
+	s, ok := testingdock.GetOrCreateSuite(t, name, testingdock.SuiteOpts{})
 	if ok {
 		t.Fatal("this suite should not exists yet")
 	}
@@ -38,7 +36,6 @@ func TestContainer_Start(t *testing.T) {
 	postgres := s.Container(testingdock.ContainerOpts{
 		Name:      "postgres",
 		ForcePull: false,
-		Verbose:   true,
 		Config: &container.Config{
 			Image: "postgres:9.6",
 		},
@@ -51,7 +48,7 @@ func TestContainer_Start(t *testing.T) {
 				},
 			},
 		},
-		HealthCheck: db.Ping,
+		HealthCheck: testingdock.HealthCheckCustom(db.Ping),
 		Reset: testingdock.ResetCustom(func() error {
 			_, err := db.Exec(`
 				DROP SCHEMA public CASCADE;
@@ -74,11 +71,20 @@ func TestContainer_Start(t *testing.T) {
 			},
 		},
 		HealthCheck: testingdock.HealthCheckHTTP("http://localhost:" + mnemosyneDebugPort + "/health"),
-		Reset:       testingdock.ResetRestart(),
+	})
+
+	randomPostgres := s.Container(testingdock.ContainerOpts{
+		Name:      "randomPostgres",
+		ForcePull: true,
+		Config: &container.Config{
+			Image: "postgres:9.6",
+		},
 	})
 
 	// add postgres to the test network
 	n.After(postgres)
+	// add another postgres to the test network
+	n.After(randomPostgres)
 	// start mnemosyned after postgres, this also adds it to the test network
 	postgres.After(mnemosyned)
 

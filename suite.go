@@ -3,10 +3,16 @@
 // Note: this library spawns containers and networks under the label
 // 'owner=testingdock', which may be subject to aggressive manipulation
 // and cleanup.
+//
+// Testingdock also makes use of the 'flag' package to set global variables.
+// Run `flag.Parse()` in your test suite main function. Possible flags are:
+//  -testingdock.sequential (spawn containers sequentially instead of parallel)
+//  -testingdock.verbose (verbose logging)
 package testingdock
 
 import (
 	"context"
+	"flag"
 	"testing"
 
 	"github.com/docker/docker/client"
@@ -15,9 +21,25 @@ import (
 
 func init() {
 	registry = make(map[string]*Suite)
+	flag.BoolVar(&SpawnSequential, "testingdock.sequential", false, "Spawn containers sequentially instead of parallel (useful for debugging)")
+	flag.BoolVar(&Verbose, "testingdock.verbose", false, "Verbose logging")
 }
 
 var registry map[string]*Suite
+
+// SpawnSequential controls whether to spawn child containers in parallel
+// or sequentially. This doesn't spawn
+// all containers in parallel, only the ones that are on the same hierarchy level, e.g.:
+//  // c1 and c2 are started in parallel after the network
+//  network.After(c1)
+//  network.After(c2)
+//  // c3 and c4 are started in parallel after c1
+//  c1.After(c3)
+//  c1.After(c4)
+var SpawnSequential bool
+
+// Verbose logging
+var Verbose bool
 
 // SuiteOpts is an option struct for getting or creating a suite in GetOrCreateSuite.
 type SuiteOpts struct {
@@ -25,8 +47,6 @@ type SuiteOpts struct {
 	Client *client.Client
 	// whether to fail on instantiation errors
 	Skip bool
-	// whether to show daemon logs
-	Verbose bool
 }
 
 // Suite represents a testing suite with a docker setup.
@@ -36,7 +56,6 @@ type Suite struct {
 	cli        *client.Client
 	network    *Network
 	logWatcher *logger.LogWatcher
-	verbose    bool
 }
 
 // GetOrCreateSuite returns a suite with the given name. If such suite is not registered yet it creates it.
@@ -60,10 +79,9 @@ func GetOrCreateSuite(t testing.TB, name string, opts SuiteOpts) (*Suite, bool) 
 	}
 
 	s := &Suite{
-		cli:     c,
-		t:       t,
-		name:    name,
-		verbose: opts.Verbose,
+		cli:  c,
+		t:    t,
+		name: name,
 	}
 	registry[s.name] = s
 	return s, false
@@ -111,7 +129,7 @@ func (s *Suite) Reset(ctx context.Context) {
 // Start starts the suite. This starts all networks in the suite and the underlying containers,
 // as well as the daemon logger, if Verbosity is enabled.
 func (s *Suite) Start(ctx context.Context) {
-	if s.logWatcher == nil && s.verbose {
+	if s.logWatcher == nil && Verbose {
 		printf("(daemon) starting logging")
 		s.logWatcher = logger.NewLogWatcher()
 		go func() {

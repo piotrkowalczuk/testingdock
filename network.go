@@ -2,6 +2,7 @@ package testingdock
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"time"
@@ -70,8 +71,25 @@ func (n *Network) start(ctx context.Context) {
 	}
 	n.gateway = ni.IPAM.Config[0].Gateway
 	printf("(setup ) %-25s (%s) - network got gateway ip: %s", n.name, n.id, n.gateway)
-	for _, cont := range n.children {
-		cont.start(ctx)
+
+	// start child containers
+	if SpawnSequential {
+		for _, cont := range n.children {
+			cont.start(ctx)
+		}
+	} else {
+		printf("(setup ) %-25s (%s) - network is spawning %d child containers in parallel", n.name, n.id, len(n.children))
+
+		var wg sync.WaitGroup
+
+		wg.Add(len(n.children))
+		for _, cont := range n.children {
+			go func(cont *Container) {
+				defer wg.Done()
+				cont.start(ctx)
+			}(cont)
+		}
+		wg.Wait()
 	}
 }
 
@@ -123,9 +141,23 @@ func (n *Network) initialCleanup(ctx context.Context) {
 // children containers if any are set in the Network struct.
 // Implements io.Closer interface.
 func (n *Network) close() error {
-	for _, cont := range n.children {
-		cont.close() // nolint: errcheck
+	if SpawnSequential {
+		for _, cont := range n.children {
+			cont.close() // nolint: errcheck
+		}
+	} else {
+		var wg sync.WaitGroup
+
+		wg.Add(len(n.children))
+		for _, cont := range n.children {
+			go func(cont *Container) {
+				defer wg.Done()
+				cont.close() // nolint: errcheck
+			}(cont)
+		}
+		wg.Wait()
 	}
+
 	n.cancel()
 	n.closed = true
 	return nil
