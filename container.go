@@ -430,12 +430,12 @@ func getCredentialsFromConfig(domain string) (string, error) {
 	}
 
 	type SecToken struct {
-		username string
-		password string
+		Username string
+		Password string
 	}
 	token := SecToken{
-		username: dcfg.Username,
-		password: dcfg.Password,
+		Username: dcfg.Username,
+		Password: dcfg.Password,
 	}
 	var jsonToken []byte
 	jsonToken, err = json.Marshal(token)
