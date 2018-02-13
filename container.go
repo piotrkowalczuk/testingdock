@@ -61,18 +61,18 @@ func HealthCheckCustom(fn func() error) HealthCheckFunc {
 
 // ResetFunc is the type of the container reset function, which is called on
 // c.Reset().
-type ResetFunc func(ctx context.Context, cli *client.Client, c *Container) error
+type ResetFunc func(ctx context.Context, c *Container) error
 
 // resetRestart is a pre-implemented ResetFunc, which just restarts the container.
 func resetRestart() ResetFunc {
-	return func(ctx context.Context, cli *client.Client, c *Container) error {
-		return cli.ContainerRestart(ctx, c.ID, nil)
+	return func(ctx context.Context, c *Container) error {
+		return c.cli.ContainerRestart(ctx, c.ID, nil)
 	}
 }
 
 // ResetCustom is just a convenience wrapper to set a ResetFunc.
 func ResetCustom(fn func() error) ResetFunc {
-	return func(ctx context.Context, cli *client.Client, c *Container) error {
+	return func(ctx context.Context, c *Container) error {
 		return fn()
 	}
 }
@@ -349,7 +349,7 @@ func (c *Container) After(cc *Container) {
 // whole configuration, including children containers.
 // Aborts early if there is any error during reset.
 func (c *Container) reset(ctx context.Context) {
-	if err := c.resetF(ctx, c.cli, c); err != nil {
+	if err := c.resetF(ctx, c); err != nil {
 		c.t.Fatalf("container reset failure: %s", err.Error())
 	}
 	c.executeHealthCheck(ctx)
