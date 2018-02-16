@@ -26,12 +26,12 @@ import (
 // "accessible" in the specified way.
 //
 // If the function returns an error, it will be called until it doesn't (blocking).
-type HealthCheckFunc func(ctx context.Context) error
+type HealthCheckFunc func(ctx context.Context, c *Container) error
 
 // HealthCheckHTTP is a pre-implemented HealthCheckFunc which checks if the given
 // url returns http.StatusOk.
 func HealthCheckHTTP(url string) HealthCheckFunc {
-	return func(ctx context.Context) error {
+	return func(ctx context.Context, c *Container) error {
 		req, err := http.NewRequest("GET", url, nil)
 
 		if err != nil {
@@ -54,7 +54,7 @@ func HealthCheckHTTP(url string) HealthCheckFunc {
 
 // HealthCheckCustom is just a convenience wrapper to set a HealthCheckFunc without any arguments.
 func HealthCheckCustom(fn func() error) HealthCheckFunc {
-	return func(ctx context.Context) error {
+	return func(ctx context.Context, c *Container) error {
 		return fn()
 	}
 }
@@ -153,7 +153,7 @@ func newContainer(t testing.TB, c *client.Client, opts ContainerOpts) *Container
 
 	// set default healthcheck
 	if opts.HealthCheck == nil {
-		cont.healthcheck = cont.healthCheckRunning()
+		cont.healthcheck = healthCheckRunning()
 	}
 
 	return cont
@@ -372,7 +372,7 @@ InfLoop:
 		case <-ctx.Done():
 			c.t.Fatalf("health check failure: %s", ctx.Err())
 		case <-time.After(1 * time.Second):
-			if err := c.healthcheck(ctx); err != nil {
+			if err := c.healthcheck(ctx, c); err != nil {
 				printf("(setup ) %-25s (%s) - container health failure: %s", c.Name, c.ID, err.Error())
 				continue InfLoop
 			}
@@ -446,24 +446,29 @@ func getCredentialsFromConfig(domain string) (string, error) {
 	return b64.StdEncoding.EncodeToString(jsonToken), nil
 }
 
-// Check if the container is running. If ContainerInspect fails at any point, assume
-// the container is not running.
-func containerIsRunning(ctx context.Context, cli *client.Client, id string) bool {
-	cjson, err := cli.ContainerInspect(ctx, id)
-	if err != nil {
-		return false
-	}
-
-	return cjson.ContainerJSONBase.State.Running
-}
-
 // healthCheckRunning is a pre-implemented HealthCheckFunc, which
 // just checks if the docker container is up and running.
-func (c *Container) healthCheckRunning() HealthCheckFunc {
-	return func(ctx context.Context) error {
-		if containerIsRunning(ctx, c.cli, c.ID) == false {
+func healthCheckRunning() HealthCheckFunc {
+	return func(ctx context.Context, c *Container) error {
+		cjson, err := c.Inspect(ctx)
+		if err != nil {
+			return err
+		}
+
+		if cjson.ContainerJSONBase.State.Running == false {
 			return fmt.Errorf("container not running")
 		}
 		return nil
 	}
+}
+
+// Inspect gives container information in JSON format, similar to the 'docker inspect'
+// command. The container must be running for this to work, otherwise it will return
+// an error.
+func (c *Container) Inspect(ctx context.Context) (*types.ContainerJSON, error) {
+	cjson, err := c.cli.ContainerInspect(ctx, c.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &cjson, nil
 }
