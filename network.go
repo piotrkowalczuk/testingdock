@@ -158,7 +158,11 @@ func (n *Network) close() error {
 		wg.Wait()
 	}
 
-	n.cancel()
+	// if the network failed to start n.cancel will not be set
+	if n.cancel != nil {
+		n.cancel()
+	}
+
 	n.closed = true
 	return nil
 }

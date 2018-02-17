@@ -333,7 +333,11 @@ func (c *Container) close() error {
 		wg.Wait()
 	}
 
-	c.cancel()
+	// if the container failed to start c.cancel will not be set
+	if c.cancel != nil {
+		c.cancel()
+	}
+
 	c.closed = true
 	return nil
 }
